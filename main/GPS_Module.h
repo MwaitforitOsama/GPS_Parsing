@@ -184,7 +184,7 @@ void get_String(char* str)
 //// USING REGEX METHOD ///////
 void get_String2(char *str)
 {
-    char* pattern_str = "^[^,]*,[^,]*,([^,]*),([NS]),([^,]*),([EW]),.*"; //Used chatgpt to create the regex
+    char* pattern_str = "^[^,]*,[^,]*,([^,]*),([NS]),([^,]*),([EW]),.*"; 
     regex_t pattern;
     regmatch_t groups[5];
 
