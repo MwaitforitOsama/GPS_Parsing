@@ -12,6 +12,7 @@
 
 ///DEFINITIONS FOR RECIEVER BUFFER /////
 
+
 static const int RX_BUF_SIZE = 2024; // buffer size to store the GPS DATA
 static void get_String(char* str);
 static void get_String2(char *str);
@@ -120,49 +121,70 @@ static void rx_task(void *arg)
 
 void get_String(char* str)
 {
-    int i=0;
-    int count =0;
+    if (strlen(str) < 50) {
+        printf("Input string is too short\n");
+        return;
+    }
+
+    // Calculate the checksum of the received data
+    unsigned char checksum = 0;
+    for (int i = 0; str[i] != '*'; i++) {
+        checksum ^= str[i];
+    }
+
+    // Convert the checksum value in the NMEA sentence to an integer
+    char* checksum_str = strtok(str, "*");
+    int checksum_value = (int)strtol(checksum_str + 1, NULL, 16);
+
+    // Compare the calculated and provided checksum values
+    if (checksum != checksum_value) {
+        printf("Checksum mismatch\n");
+        return;
+    }
+
+    // Extract latitude and longitude from the received data
+    int i = 0;
+    int count = 0;
     int k = 0;
     int n = 0;
     char new[50];
-    while(count < 2)
-    {
-        if(str[i] == ',')
-        {
+    while (count < 2) {
+        if (str[i] == ',') {
             count++;
         }
         i++;
     }
-    if (count != 2 || strlen(str) < 48 || str[6] != '.' || str[16] != '.' || str[28] != ',' || str[33] != ',' || str[42] != ',')
-    {
-        printf("Wrong input\n");
+
+    if (count != 2 || str[6] != '.' || str[16] != '.' || str[28] != ',' || str[33] != ',' || str[42] != ',') {
+        printf("Wrong input format\n");
         return;
     }
+
     int j = 0;
-    for(j = i ; i+24;j++)
-    {
+    for (j = i; i + 24; j++) {
         new[k] = str[j];
         k++;
     }
+
     new[k] = '\n';
-    while(new[n] != '\n')
-    {
+    while (new[n] != '\n') {
         printf("%c", new[n]);
         n++;
     }
+
     printf("%c", '\n');
-    for(int x = n+1 ; new[x] != '\n' ; x++)
-    {
+
+    for (int x = n + 1; new[x] != '\n'; x++) {
         printf("%c", new[x]);
     }
+
     printf("%c", '\n');
 }
 
-
-
+//// USING REGEX METHOD ///////
 void get_String2(char *str)
 {
-    char* pattern_str = "^[^,]*,[^,]*,([^,]*),([NS]),([^,]*),([EW]),.*";
+    char* pattern_str = "^[^,]*,[^,]*,([^,]*),([NS]),([^,]*),([EW]),.*"; //Used chatgpt to create the regex
     regex_t pattern;
     regmatch_t groups[5];
 
