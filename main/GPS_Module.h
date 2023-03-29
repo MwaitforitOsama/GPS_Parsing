@@ -7,12 +7,14 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
+#include <regex.h>
 
 
 ///DEFINITIONS FOR RECIEVER BUFFER /////
 
 static const int RX_BUF_SIZE = 2024; // buffer size to store the GPS DATA
 static void get_String(char* str);
+static void get_String2(char *str);
 
 char arr1[] = "Latt";
 char arr2[] = "Long";
@@ -101,7 +103,8 @@ static void rx_task(void *arg)
                 const int len = i+2;
                 data[rxbytes] = 0;
             uart_write_bytes(UART_NUM_0 , (const char *)str2 , len);
-            get_String((char*)str2);
+            get_String((char*)str2); // STRING PARSING
+            get_String2((char*)str2); // USING REGEX
             }
            
             
@@ -115,14 +118,14 @@ static void rx_task(void *arg)
     free(str2);
 } 
 
-static void get_String(char* str)
+void get_String(char* str)
 {
     int i=0;
     int count =0;
     int k = 0;
     int n = 0;
     char new[50];
-    while(count < 2) //AS before every string there are two commas
+    while(count < 2)
     {
         if(str[i] == ',')
         {
@@ -130,8 +133,12 @@ static void get_String(char* str)
         }
         i++;
     }
+    if (count != 2 || strlen(str) < 48 || str[6] != '.' || str[16] != '.' || str[28] != ',' || str[33] != ',' || str[42] != ',')
+    {
+        printf("Wrong input\n");
+        return;
+    }
     int j = 0;
-    str[29] = '\n';
     for(j = i ; i+24;j++)
     {
         new[k] = str[j];
@@ -140,13 +147,50 @@ static void get_String(char* str)
     new[k] = '\n';
     while(new[n] != '\n')
     {
-        printf(new[n]);
+        printf("%c", new[n]);
         n++;
     }
+    printf("%c", '\n');
     for(int x = n+1 ; new[x] != '\n' ; x++)
     {
-        printf(new[x]);
+        printf("%c", new[x]);
     }
-    vTaskDelay(1000/portTICK_RATE_MS);
-
+    printf("%c", '\n');
 }
+
+
+
+void get_String2(char *str)
+{
+    char* pattern_str = "^[^,]*,[^,]*,([^,]*),([NS]),([^,]*),([EW]),.*";
+    regex_t pattern;
+    regmatch_t groups[5];
+
+    if (regcomp(&pattern, pattern_str, REG_EXTENDED)) {
+        fprintf(stderr, "Could not compile regex\n");
+        return 1;
+    }
+
+    if (regexec(&pattern, str, 5, groups, 0)) {
+        fprintf(stderr, "No match found\n");
+        return 1;
+    }
+
+    char* latitude = malloc(groups[1].rm_eo - groups[1].rm_so + 2);
+    strncpy(latitude, str + groups[1].rm_so, groups[1].rm_eo - groups[1].rm_so);
+    latitude[groups[1].rm_eo - groups[1].rm_so] = groups[2].rm_so == -1 ? '\0' : str[groups[2].rm_so];
+
+    char* longitude = malloc(groups[3].rm_eo - groups[3].rm_so + 2);
+    strncpy(longitude, str + groups[3].rm_so, groups[3].rm_eo - groups[3].rm_so);
+    longitude[groups[3].rm_eo - groups[3].rm_so] = groups[4].rm_so == -1 ? '\0' : str[groups[4].rm_so];
+
+    printf("Latitude: %s\n", latitude);
+    printf("Longitude: %s\n", longitude);
+
+    free(latitude);
+    free(longitude);
+    regfree(&pattern);
+}
+
+
+//$GPGGA,002153.000,  (3342.6618,N) ,11751.3858,W,1,10,1.2,27.0,M,-34.2,M,,0000*5E
